@@ -5,15 +5,10 @@ import csv
 
 app = Flask(__name__)
 
-# Web scraping function
 def scrape_data():
     url = 'https://www.envigo.co.in/'
-    source = urllib.request.urlopen(url).read()
-
-    # Parse the HTML content using BeautifulSoup
+    source = urllib.request.urlopen(url).read
     soup = bs.BeautifulSoup(source, 'lxml')
-
-    # Create a dictionary to store the scraped data
     data = {
         'title': soup.title.string if soup.title else 'No Title',
         'headings': [],
