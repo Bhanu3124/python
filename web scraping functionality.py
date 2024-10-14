@@ -1,7 +1,7 @@
 import bs4 as bs
 import urllib.request
 import csv
-import re
+import re  
 
 def fetch_page(url):
     try:
@@ -17,7 +17,6 @@ def new_func(soup):
     return soup.find('p', class_='jstest')
 
 def sanitize_filename(url):
-    
     return re.sub(r'\W+', '_', url)
 
 def scrape_website(url):
@@ -25,7 +24,7 @@ def scrape_website(url):
 
     if soup:
         try:
-        
+            
             sanitized_filename = sanitize_filename(url)
             csv_filename = f'{sanitized_filename}.csv'
 
@@ -83,6 +82,9 @@ def scrape_website(url):
                     writer.writerow(['JavaScript Test Paragraph', 'No JS Test Found'])
 
             print(f"Data extraction completed successfully. Saved to {csv_filename}")
+            
+            send_response(csv_filename)
+            
         except PermissionError:
             print("Permission denied: Unable to write to the CSV file. Please ensure the file is not open in another program and you have write permissions.")
         except Exception as e:
@@ -90,5 +92,9 @@ def scrape_website(url):
     else:
         print("Failed to retrieve or parse the page.")
 
+def send_response(filename):
+    print(f"Your CSV file '{filename}' has been successfully created and downloaded.")
+
 url = 'https://python.langchain.com/'
 scrape_website(url)
+
