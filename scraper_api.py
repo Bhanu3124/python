@@ -1,8 +1,9 @@
+from flask import Flask, request, send_file, jsonify
 import bs4 as bs
 import urllib.request
 import csv
+import re
 import os
-from flask import Flask, request, send_file, jsonify
 
 app = Flask(__name__)
 
@@ -19,19 +20,18 @@ def fetch_page(url):
 def new_func(soup):
     return soup.find('p', class_='jstest')
 
-@app.route('/scrape', methods=['GET'])
-def scrape_website():
-    url = request.args.get('url')  
-    if not url:
-        return jsonify({"error": "No URL provided."}), 400
+def sanitize_filename(url):
+    return re.sub(r'\W+', '_', url)
 
+def scrape_website(url):
     soup = fetch_page(url)
-    
+
     if soup:
-        csv_file_path = 'scrape_data.csv'  
-        
         try:
-            with open(csv_file_path, mode='w', newline='', encoding='utf-8') as file:
+            sanitized_filename = sanitize_filename(url)
+            csv_filename = f'{sanitized_filename}.csv'
+
+            with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
 
                 writer.writerow(['Title', 'First Paragraph'])
@@ -48,9 +48,9 @@ def scrape_website():
                 writer.writerow(['All Links'])
                 for link in soup.find_all('a', href=True):
                     href = link['href'].strip()
-                    link_text = link.text.strip() or 'No Text' 
+                    link_text = link.text.strip() or 'No Text'
                     if href: 
-                        writer.writerow([link_text, href]) 
+                        writer.writerow([link_text, href])
 
                 writer.writerow(['All Image Sources'])
                 for img in soup.find_all('img', src=True):
@@ -75,22 +75,47 @@ def scrape_website():
                         cols = row.find_all('td')
                         if cols:  
                             writer.writerow([' | '.join(col.text.strip() for col in cols)])
+
+                writer.writerow(['XML Links'])
+
                 js_test = new_func(soup)
                 if js_test:
                     writer.writerow(['JavaScript Test Paragraph', js_test.text.strip()])
                 else:
                     writer.writerow(['JavaScript Test Paragraph', 'No JS Test Found'])
 
-            print("Data extraction completed successfully.")
-            return send_file(csv_file_path, as_attachment=True) 
-            
+            return csv_filename
+
         except PermissionError:
-            return jsonify({"error": "Permission denied: Unable to write to 'scrape_data.csv'."}), 500
+            return "Permission denied: Unable to write to the CSV file."
         except Exception as e:
-            return jsonify({"error": f"An error occurred while writing to CSV: {e}"}), 500
+            return f"An error occurred while writing to CSV: {e}"
     else:
-        return jsonify({"error": "Failed to retrieve or parse the page."}), 500
+        return "Failed to retrieve or parse the page."
+
+@app.route('/scrape', methods=['POST'])
+def scrape_and_download():
+    data = request.get_json()
+    url = data.get('url')
+
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    csv_filename = scrape_website(url)
+    
+    if not os.path.exists(csv_filename):
+        return jsonify({"error": "Failed to generate CSV file."}), 500
+
+    return jsonify({"message": "Scraping completed successfully", "filename": csv_filename})
+
+@app.route('/download/<filename>', methods=['GET'])
+def download_file(filename):
+    file_path = f"{filename}.csv"
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    else:
+        return jsonify({"error": "File not found"}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(port=8000, debug=True)
 
